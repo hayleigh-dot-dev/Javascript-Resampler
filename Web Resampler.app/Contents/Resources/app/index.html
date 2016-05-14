@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Web Resampler</title>
+        <link href="css/skeleton.css" rel="stylesheet">
+        <link href="css/styles.css" rel="stylesheet">
+    </head>
+    <body>
+		<div class="container" style="width: 600px;">
+			<h1 style="text-align: center">Web Resampler</h1>
+            <div class="container">
+                <button class="u-full-width button-primary" onclick="getElementById('fileInput').click()">Upload a file.</button>
+                <i>Target sample rate.</i>
+                <br>
+                <select id="sampleRate">
+                    <option value=22050>22050</option>
+                    <option value=24000>24000</option>
+                    <option value=44100>44100</option>
+                    <option value=48000>48000</option>
+                    <option value=88200>88200</option>
+                    <option value=96000>96000</option>
+                </select>
+            </div>
+            <div style="height: 375px; overflow: scroll;">
+                <p>
+                    A simple application that resamples an uploaded .wav file and downloads the result. Upsampling is achieved by simple linear interpolation, the equation used can be found <a href="https://www.easycalculation.com/formulas/linear-interpolation.html">here</a>. My javascript implementation is below.
+                </p>
+                <pre>
+                    <code>
+function linearInterpolate(x1, y1, x2, y2, targetX) {
+    var targetY;
+    targetY = ((targetX - x1) * (y2 - y1) / (x2 - x1)) + y1;
+    return targetY;
+}
+                    </code>
+                </pre>
+                <p>
+                    The targetX value comes from calculating <code>inputSR / outputSR</code> and incrementing this value after every interpolation calculation. If <code>targetX</code> exceeds <code>i + 1</code> we then increment <code>i</code> to move on to interpolating between the next two values in the array.
+                </p>
+                <pre>
+                    <code>
+while (i &lt; inputLength) {
+    audioOutputLeft[j] = linearInterpolate(i, inL[i], i + 1, inL[i + 1], targetX);
+    audioOutputRight[j] = linearInterpolate(i, inR[i], i + 1, inR[i + 1], targetX);
+    j += 1;
+    targetX += count;
+    if (targetX &gt;= i + 1) {
+        i += 1;
+    }
+}
+                    </code>
+                </pre>
+                <p>
+                    Downsampling is accomplished by averaging n number of input samples where n is the downsampling factor; <code>inputSR / outputSR</code>. When this value is not an integer first the input signal is upsampled to the lowest multiple of the desired samplerate that is greater than the input samplerate. Unfortunately as of now downsampling does not work. CPU usage rockets to 99% and the script hangs when trying to downsample.
+                </p>
+                <pre>
+                    <code>
+function sampleAveraging(dsFactor, audioBuffer, index) {
+    var i = 0,
+        j = 0,
+        result;
+    for (i = 0; i &lt; dsFactor; i += 1) {
+        j += audioBuffer[index + i];
+    }
+    result = j / dsFactor;
+    return result;
+}
+                    </code>
+                    <code>
+var i = 0,
+    j = 0,
+    downsamplingFactor = inputSampleRate / targetSampleRate,
+    tempSampleRate;
+if (downsamplingFactor % 1 !== 0) {
+    i = 0;
+    while (i &lt; 10) {
+        if (targetSampleRate * i &gt; inputSampleRate) {
+            tempSampleRate = targetSampleRate * i;
+            break;
+        } else {
+            i += 1;
+        }
+    }
+    upsample(inL, inR, tempSampleRate);
+    inL = audioOutputLeft;
+    inR = audioOutputRight;
+    downsamplingFactor = tempSampleRate / targetSampleRate;
+                    </code>
+                </pre>
+                <p>
+                    
+                </p>
+            </div>
+        </div>
+        <input id="fileInput" type="file" accept=".wav" style="display:none;">
+        <script src="js/resampler.js" type="text/javascript"></script>
+    </body>
+</html>

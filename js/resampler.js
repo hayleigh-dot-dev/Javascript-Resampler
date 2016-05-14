@@ -15,7 +15,7 @@ var fileReader          = null,
     inputSampleRate     = 0,
     inputBitDepth       = 0,
     inputLength         = 0,
-    outputSampleRate    = 96000,
+    outputSampleRate    = null,
 // DOM elements.
     fileInput           = null,
     download            = null;
@@ -178,7 +178,7 @@ function render(audioBuffer) {
         url,
         link,
         click;
-    arrayBuffer = new ArrayBuffer(44 + length * 4);
+    arrayBuffer = new ArrayBuffer(44 + length * 2);
     dataView = new DataView(arrayBuffer);
     i = 0;
     j = 44;
@@ -223,8 +223,12 @@ window.onload = function () {
     fileInput.onchange = function () {
         fileReader = new FileReader();
         fileReader.onload = function () {
+            // Set the output sample rate to the selected sample rate in the dropdown menu.
+            outputSampleRate = document.getElementById('sampleRate').value;
+            
             audioInfoDataView = new DataView(this.result);
             // Read .wav RIFF header and store some relevant information.
+            console.log('Input information:');
             inputNumChannels = audioInfoDataView.getUint16(22, true);
             console.log('Channel count: ' + inputNumChannels);
             inputSampleRate = audioInfoDataView.getUint32(24, true);
@@ -259,5 +263,7 @@ window.onload = function () {
             render(audioOutputBuffer);
         };
         fileReader.readAsArrayBuffer(this.files[0]);
+        // Reset the fileInput. The onchange event will not fire if the same file is uploaded twice otherwise.
+        fileInput.value = '';
     };
 };

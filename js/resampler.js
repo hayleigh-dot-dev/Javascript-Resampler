@@ -15,7 +15,7 @@ var fileReader          = null,
     inputSampleRate     = 0,
     inputBitDepth       = 0,
     inputLength         = 0,
-    outputSampleRate    = 24000,
+    outputSampleRate    = 96000,
 // DOM elements.
     fileInput           = null,
     download            = null;
@@ -66,91 +66,73 @@ function getAudio(dataView) {
 // the input audio is upsampled to a multiple of the  //
 // target output sample rate, and then downsampled    //
 // from there.                                        */
-function resample(inL, inR) {
+function upsample(inL, inR, targetSampleRate) {
+    // Formula for the linear interpolation can be found here:
+    // https://www.easycalculation.com/formulas/linear-interpolation.html
     function linearInterpolate(x1, y1, x2, y2, targetX) {
         var targetY;
         targetY = ((targetX - x1) * (y2 - y1) / (x2 - x1)) + y1;
         return targetY;
     }
-    function downsample(dsFactor, audioBuffer, index) {
+    var i = 0,
+        j = 0,
+        targetX = 0,
+        count = inputSampleRate / targetSampleRate;
+    audioOutputLeft = new Float32Array(inputLength * (targetSampleRate / inputSampleRate));
+    audioOutputRight = new Float32Array(inputLength * (targetSampleRate / inputSampleRate));
+    i = 0;
+    j = 0;
+    while (i < inputLength) {
+        audioOutputLeft[j] = linearInterpolate(i, inL[i], i + 1, inL[i + 1], targetX);
+        audioOutputRight[j] = linearInterpolate(i, inR[i], i + 1, inR[i + 1], targetX);
+        j += 1;
+        targetX += count;
+        if (targetX >= i + 1) {
+            i += 1;
+        }
+    }
+}
+// There appears to be a memory leak or some other ineffeciency with the downsample function.
+function downsample(inL, inR, targetSampleRate) {
+    function sampleAveraging(dsFactor, audioBuffer, index) {
         var i = 0,
             j = 0,
             result;
         for (i = 0; i < dsFactor; i += 1) {
-            j += audioBuffer[i + index];
+            j += audioBuffer[index + i];
         }
         result = j / dsFactor;
         return result;
     }
     var i = 0,
         j = 0,
-        targetX = 0,
-        count = inputSampleRate / outputSampleRate,
-        downsampleFactor = inputSampleRate / outputSampleRate,
-        tempSampleRate,
-        leftTempBuffer,
-        rightTempBuffer;
-    // Upsample
-    if (inputSampleRate / outputSampleRate < 1) {
-        console.log('Upsampling...');
-        audioOutputLeft = new Float32Array(inputLength * (outputSampleRate / inputSampleRate));
-        audioOutputRight = new Float32Array(inputLength * (outputSampleRate / inputSampleRate));
+        downsamplingFactor = inputSampleRate / targetSampleRate,
+        tempSampleRate;
+    // If ds factor is not an integer, find the lowest multiple of the output SR that is greater than this input SR.
+    if (downsamplingFactor % 1 !== 0) {
         i = 0;
-        while (i < inputLength) {
-            audioOutputLeft[j] = linearInterpolate(i, inL[i], i + 1, inL[i + 1], targetX);
-            audioOutputRight[j] = linearInterpolate(i, inR[i], i + 1, inR[i + 1], targetX);
-            j += 1;
-            targetX += count;
-            if (targetX >= i + 1) {
+        while (i < 10) {
+            if (targetSampleRate * i > inputSampleRate) {
+                tempSampleRate = targetSampleRate * i;
+                break;
+            } else {
                 i += 1;
             }
         }
-    // Downsample
-    } else if (inputSampleRate / outputSampleRate > 1) {
-        console.log('Downsampling...');
-        // If the downsample factor is not a whole number, upsample first.
-        if (downsampleFactor % 1 !== 0) {
-            console.log('Downsampling factor is not an integer.');
-            console.log('Performing multirate resampling...');
-            while (i < 10) {
-                if (i * outputSampleRate > inputSampleRate) {
-                    tempSampleRate = i;
-                    break;
-                } else {
-                    i += 1;
-                }
-            }
-            leftTempBuffer = new Float32Array(inputLength * ((outputSampleRate * tempSampleRate) / inputSampleRate));
-            rightTempBuffer = new Float32Array(inputLength * ((outputSampleRate * tempSampleRate) / inputSampleRate));
-            i = 0;
-            count = inputSampleRate / (outputSampleRate * tempSampleRate);
-            while (i < inputLength) {
-                leftTempBuffer[j] = linearInterpolate(i, inL[i], i + 1, inL[i + 1], targetX);
-                rightTempBuffer[j] = linearInterpolate(i, inR[i], i + 1, inR[i + 1], targetX);
-                j += 1;
-                targetX += count;
-                if (targetX >= i + 1) {
-                    i += 1;
-                }
-            }
-            // Copy data from temporary buffers back to input buffers.
-            inL = leftTempBuffer;
-            inR = rightTempBuffer;
-            // Recalculate downsample factor.
-            downsampleFactor = (tempSampleRate * outputSampleRate) / outputSampleRate;
-        }
-        audioOutputLeft = new Float32Array(inputLength / downsampleFactor);
-        audioOutputRight = new Float32Array(inputLength / downsampleFactor);
-        while (i < inputLength) {
-            audioOutputLeft[j] = downsample(downsampleFactor, inL, i);
-            console.log(audioOutputLeft[j]);
-            audioOutputRight[j] = downsample(downsampleFactor, inR, i);
-            j += 1;
-            i += downsampleFactor;
-        }
-    } else {
-        audioOutputLeft = audioInputLeft;
-        audioOutputRight = audioInputRight;
+        upsample(inL, inR, tempSampleRate);
+        /* The upsample function writes data to the audioOutput buffers.  //
+        // We'll copy this data over to the inL/inR variables and rewrite //
+        // the audioOutput buffers again when downsampling.               */
+        inL = audioOutputLeft;
+        inR = audioOutputRight;
+        downsamplingFactor = tempSampleRate / targetSampleRate;
+    }
+    audioOutputLeft = new Float32Array(inputLength / downsamplingFactor);
+    audioOutputRight = new Float32Array(inputLength / downsamplingFactor);
+    for (i = 0; i < inputLength; i += downsamplingFactor) {
+        audioOutputLeft[j] = downsample(downsamplingFactor, inL, i);
+        audioOutputRight[j] = downsample(downsamplingFactor, inR, i);
+        j += 1;
     }
 }
 
@@ -171,6 +153,14 @@ function stereoInterleave(inL, inR) {
 	return result;
 }
 
+/* The render function writes the audio data into a   //
+// new DataView as well as rewriting the RIFF header  //
+// information. stringToUint converts the UTF-8       //
+// encoded characters to unsigned 8bit integers. As   //
+// with reading from a DataView the process is very   //
+// much the same, creating an ArrayBuffer of the right//
+// length and then interfacing with this ArrayBuffer  //
+// with a DataView.                                   */
 function render(audioBuffer) {
     function stringToUint(dataView, offset, string) {
         var length = string.length,
@@ -192,6 +182,7 @@ function render(audioBuffer) {
     dataView = new DataView(arrayBuffer);
     i = 0;
     j = 44;
+    console.log('');
     console.log('Output infortmation:');
     stringToUint(dataView, 0, 'RIFF');                              // Chunk ID
     dataView.setUint32(4, 44 + length * 2, true);                   // Chunk Size
@@ -248,7 +239,16 @@ window.onload = function () {
             getAudio(audioInfoDataView);
 
             // Resample audio data at new sample rate.
-            resample(audioInputLeft, audioInputRight);
+            // If statement to determine upsampling, downsampling or no action.
+            if (outputSampleRate > inputSampleRate) {
+                upsample(audioInputLeft, audioInputRight, outputSampleRate);
+            } else if (outputSampleRate < inputSampleRate) {
+                window.alert('Downsampling is not supported at this time.');
+                //downsample(audioInputLeft, audioInputRight, outputSampleRate);
+            } else {
+                audioOutputLeft = audioInputLeft;
+                audioOutputRight = audioInputRight;
+            }
 
             // If input is stereo create a stereo interleaved array.
             if (inputNumChannels === 2) {

@@ -17,8 +17,7 @@ var fileReader          = null,
     inputLength         = 0,
     outputSampleRate    = null,
 // DOM elements.
-    fileInput           = null,
-    download            = null;
+    fileInput           = null;
 
 /* The getAudio function reads the binary data in the //
 // DataView as signed 16bit integers and copies this  //
@@ -79,12 +78,16 @@ function upsample(inL, inR, targetSampleRate) {
         targetX = 0,
         count = inputSampleRate / targetSampleRate;
     audioOutputLeft = new Float32Array(inputLength * (targetSampleRate / inputSampleRate));
-    audioOutputRight = new Float32Array(inputLength * (targetSampleRate / inputSampleRate));
+    if (inputNumChannels === 2) {
+        audioOutputRight = new Float32Array(inputLength * (targetSampleRate / inputSampleRate));
+    }
     i = 0;
     j = 0;
     while (i < inputLength) {
         audioOutputLeft[j] = linearInterpolate(i, inL[i], i + 1, inL[i + 1], targetX);
-        audioOutputRight[j] = linearInterpolate(i, inR[i], i + 1, inR[i + 1], targetX);
+        if (inputNumChannels === 2) {
+            audioOutputRight[j] = linearInterpolate(i, inR[i], i + 1, inR[i + 1], targetX);
+        }
         j += 1;
         targetX += count;
         if (targetX >= i + 1) {
@@ -92,7 +95,6 @@ function upsample(inL, inR, targetSampleRate) {
         }
     }
 }
-// There appears to be a memory leak or some other ineffeciency with the downsample function.
 function downsample(inL, inR, targetSampleRate) {
     var i = 0,
         j = 0,
@@ -116,18 +118,26 @@ function downsample(inL, inR, targetSampleRate) {
         // We'll copy this data over to the inL/inR variables and rewrite //
         // the audioOutput buffers again when downsampling.               */
         inL = audioOutputLeft;
-        inR = audioOutputRight;
+        if (inputNumChannels === 2) {
+            inR = audioOutputRight;
+        }
         downsamplingFactor = tempSampleRate / targetSampleRate;
     }
     audioOutputLeft = new Float32Array(inputLength / downsamplingFactor);
-    audioOutputRight = new Float32Array(inputLength / downsamplingFactor);
+    if (inputNumChannels === 2) {
+        audioOutputRight = new Float32Array(inputLength / downsamplingFactor);
+    }
     for (i = 0; i < inputLength; i += downsamplingFactor) {
+        // Antialiasing is copied from an algorithm posted at musicdsp.org
+        // http://musicdsp.org/showArchiveComment.php?ArchiveID=214
         audioOutputLeft[j] = filterStateL + (inL[i] * 0.5);
         filterStateL = inL[i] * 0.25;
         audioOutputLeft[j] += filterStateL;
-        audioOutputRight[j] = filterStateR + (inR[i] * 0.5);
-        filterStateR = inR[i] * 0.25;
-        audioOutputRight[j] += filterStateR;
+        if (inputNumChannels === 2) {
+            audioOutputRight[j] = filterStateR + (inR[i] * 0.5);
+            filterStateR = inR[i] * 0.25;
+            audioOutputRight[j] += filterStateR;
+        }
         j += 1;
     }
 }
@@ -234,10 +244,9 @@ window.onload = function () {
             inputLength = audioInfoDataView.getUint32(40, true) / inputNumChannels / (inputBitDepth / 8);
             console.log('Audio length (samples): ' + inputLength);
             console.log('Audio length (seconds): ' + inputLength / inputSampleRate);
-
+            
             // Get audio data from the DataView.
             getAudio(audioInfoDataView);
-
             // Resample audio data at new sample rate.
             // If statement to determine upsampling, downsampling or no action.
             if (outputSampleRate > inputSampleRate) {
@@ -255,6 +264,7 @@ window.onload = function () {
             } else {
                 audioOutputBuffer = audioOutputLeft;
             }
+
             render(audioOutputBuffer);
         };
         fileReader.readAsArrayBuffer(this.files[0]);

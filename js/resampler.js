@@ -97,6 +97,8 @@ function downsample(inL, inR, targetSampleRate) {
     var i = 0,
         j = 0,
         downsamplingFactor = inputSampleRate / targetSampleRate,
+        filterStateL = 0,
+        filterStateR = 0,
         tempSampleRate;
     // If ds factor is not an integer, find the lowest multiple of the output SR that is greater than this input SR.
     if (downsamplingFactor % 1 !== 0) {
@@ -120,8 +122,12 @@ function downsample(inL, inR, targetSampleRate) {
     audioOutputLeft = new Float32Array(inputLength / downsamplingFactor);
     audioOutputRight = new Float32Array(inputLength / downsamplingFactor);
     for (i = 0; i < inputLength; i += downsamplingFactor) {
-        audioOutputLeft[j] = inL[i];
-        audioOutputRight[j] = inR[i];
+        audioOutputLeft[j] = filterStateL + (inL[i] * 0.5);
+        filterStateL = inL[i] * 0.25;
+        audioOutputLeft[j] += filterStateL;
+        audioOutputRight[j] = filterStateR + (inR[i] * 0.5);
+        filterStateR = inR[i] * 0.25;
+        audioOutputRight[j] += filterStateR;
         j += 1;
     }
 }

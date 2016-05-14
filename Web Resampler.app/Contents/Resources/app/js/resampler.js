@@ -94,19 +94,11 @@ function upsample(inL, inR, targetSampleRate) {
 }
 // There appears to be a memory leak or some other ineffeciency with the downsample function.
 function downsample(inL, inR, targetSampleRate) {
-    function sampleAveraging(dsFactor, audioBuffer, index) {
-        var i = 0,
-            j = 0,
-            result;
-        for (i = 0; i < dsFactor; i += 1) {
-            j += audioBuffer[index + i];
-        }
-        result = j / dsFactor;
-        return result;
-    }
     var i = 0,
         j = 0,
         downsamplingFactor = inputSampleRate / targetSampleRate,
+        filterStateL = 0,
+        filterStateR = 0,
         tempSampleRate;
     // If ds factor is not an integer, find the lowest multiple of the output SR that is greater than this input SR.
     if (downsamplingFactor % 1 !== 0) {
@@ -130,8 +122,12 @@ function downsample(inL, inR, targetSampleRate) {
     audioOutputLeft = new Float32Array(inputLength / downsamplingFactor);
     audioOutputRight = new Float32Array(inputLength / downsamplingFactor);
     for (i = 0; i < inputLength; i += downsamplingFactor) {
-        audioOutputLeft[j] = downsample(downsamplingFactor, inL, i);
-        audioOutputRight[j] = downsample(downsamplingFactor, inR, i);
+        audioOutputLeft[j] = filterStateL + (inL[i] * 0.5);
+        filterStateL = inL[i] * 0.25;
+        audioOutputLeft[j] += filterStateL;
+        audioOutputRight[j] = filterStateR + (inR[i] * 0.5);
+        filterStateR = inR[i] * 0.25;
+        audioOutputRight[j] += filterStateR;
         j += 1;
     }
 }
@@ -247,8 +243,7 @@ window.onload = function () {
             if (outputSampleRate > inputSampleRate) {
                 upsample(audioInputLeft, audioInputRight, outputSampleRate);
             } else if (outputSampleRate < inputSampleRate) {
-                window.alert('Downsampling is not supported at this time.');
-                //downsample(audioInputLeft, audioInputRight, outputSampleRate);
+                downsample(audioInputLeft, audioInputRight, outputSampleRate);
             } else {
                 audioOutputLeft = audioInputLeft;
                 audioOutputRight = audioInputRight;

@@ -3,7 +3,6 @@
     <head>
         <title>Web Resampler</title>
         <link href="css/skeleton.css" rel="stylesheet">
-        <link href="css/styles.css" rel="stylesheet">
     </head>
     <body>
 		<div class="container" style="width: 600px;">
@@ -59,11 +58,13 @@ function downsample(inL, inR, targetSampleRate) {
     var i = 0,
         j = 0,
         downsamplingFactor = inputSampleRate / targetSampleRate,
+        filterStateL = 0,
+        filterStateR = 0,
         tempSampleRate;
     if (downsamplingFactor % 1 !== 0) {
         i = 0;
         while (i &lt; 10) {
-            if (targetSampleRate * i &gt; inputSampleRate) {
+            if (targetSampleRate * i > inputSampleRate) {
                 tempSampleRate = targetSampleRate * i;
                 break;
             } else {
@@ -74,6 +75,18 @@ function downsample(inL, inR, targetSampleRate) {
         inL = audioOutputLeft;
         inR = audioOutputRight;
         downsamplingFactor = tempSampleRate / targetSampleRate;
+    }
+    audioOutputLeft = new Float32Array(inputLength / downsamplingFactor);
+    audioOutputRight = new Float32Array(inputLength / downsamplingFactor);
+    for (i = 0; i &lt; inputLength; i += downsamplingFactor) {
+        audioOutputLeft[j] = filterStateL + (inL[i] * 0.5);
+        filterStateL = inL[i] * 0.25;
+        audioOutputLeft[j] += filterStateL;
+        audioOutputRight[j] = filterStateR + (inR[i] * 0.5);
+        filterStateR = inR[i] * 0.25;
+        audioOutputRight[j] += filterStateR;
+        j += 1;
+    }
 }
                     </code>
                 </pre>

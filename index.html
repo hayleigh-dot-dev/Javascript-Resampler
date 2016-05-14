@@ -51,45 +51,50 @@ while (i &lt; inputLength) {
                     </code>
                 </pre>
                 <p>
-                    Downsampling is accomplished by averaging n number of input samples where n is the downsampling factor; <code>inputSR / outputSR</code>. When this value is not an integer first the input signal is upsampled to the lowest multiple of the desired samplerate that is greater than the input samplerate. Unfortunately as of now downsampling does not work. CPU usage rockets to 99% and the script hangs when trying to downsample.
+                    Downsampling is accomplished by taking every n samples from the input where n is the downsampling ratio; <code>inputSR / outputSR</code>. When this value is not an integer first the input signal is upsampled to the lowest multiple of the desired samplerate that is greater than the input samplerate. The audio is not filtered and aliasing <b><i>will</i></b> be present if the source audio contains frequencies above the nyquist frequency of the output sample rate.
                 </p>
                 <pre>
                     <code>
-function sampleAveraging(dsFactor, audioBuffer, index) {
+function downsample(inL, inR, targetSampleRate) {
     var i = 0,
         j = 0,
-        result;
-    for (i = 0; i &lt; dsFactor; i += 1) {
-        j += audioBuffer[index + i];
-    }
-    result = j / dsFactor;
-    return result;
-}
-                    </code>
-                    <code>
-var i = 0,
-    j = 0,
-    downsamplingFactor = inputSampleRate / targetSampleRate,
-    tempSampleRate;
-if (downsamplingFactor % 1 !== 0) {
-    i = 0;
-    while (i &lt; 10) {
-        if (targetSampleRate * i &gt; inputSampleRate) {
-            tempSampleRate = targetSampleRate * i;
-            break;
-        } else {
-            i += 1;
+        downsamplingFactor = inputSampleRate / targetSampleRate,
+        tempSampleRate;
+    if (downsamplingFactor % 1 !== 0) {
+        i = 0;
+        while (i &lt; 10) {
+            if (targetSampleRate * i &gt; inputSampleRate) {
+                tempSampleRate = targetSampleRate * i;
+                break;
+            } else {
+                i += 1;
+            }
         }
-    }
-    upsample(inL, inR, tempSampleRate);
-    inL = audioOutputLeft;
-    inR = audioOutputRight;
-    downsamplingFactor = tempSampleRate / targetSampleRate;
+        upsample(inL, inR, tempSampleRate);
+        inL = audioOutputLeft;
+        inR = audioOutputRight;
+        downsamplingFactor = tempSampleRate / targetSampleRate;
+}
                     </code>
                 </pre>
                 <p>
-                    
+                    Information from the RIFF header is read and written according to the specification found <a href="http://soundfile.sapp.org/doc/WaveFormat/">here</a>. More specifically, the binary data is stored and written in an ArrayBuffer, a JavaScript object representing raw binary data. An ArrayBuffer cannot be manipulated directly, instead a DataView is created which can read the data at any given byte as the type specifed. For example <code>DataView.getUint16(32, true)</code> will read that data at byte 32 as an unsigned 16bit integer. The <code>true</code> argument is optional and if specified reads the data as little endian.
                 </p>
+                <pre>
+                    <code>
+audioInfoDataView = new DataView(this.result);
+console.log('Input information:');
+inputNumChannels = audioInfoDataView.getUint16(22, true);
+console.log('Channel count: ' + inputNumChannels);
+inputSampleRate = audioInfoDataView.getUint32(24, true);
+console.log('Sample rate: ' + inputSampleRate);
+inputBitDepth = audioInfoDataView.getUint16(34, true);
+console.log('Bit depth: ' + inputBitDepth);
+inputLength = audioInfoDataView.getUint32(40, true) / inputNumChannels / (inputBitDepth / 8);
+console.log('Audio length (samples): ' + inputLength);
+console.log('Audio length (seconds): ' + inputLength / inputSampleRate);
+                    </code>
+                </pre>
             </div>
         </div>
         <input id="fileInput" type="file" accept=".wav" style="display:none;">

@@ -94,16 +94,6 @@ function upsample(inL, inR, targetSampleRate) {
 }
 // There appears to be a memory leak or some other ineffeciency with the downsample function.
 function downsample(inL, inR, targetSampleRate) {
-    function sampleAveraging(dsFactor, audioBuffer, index) {
-        var i = 0,
-            j = 0,
-            result;
-        for (i = 0; i < dsFactor; i += 1) {
-            j += audioBuffer[index + i];
-        }
-        result = j / dsFactor;
-        return result;
-    }
     var i = 0,
         j = 0,
         downsamplingFactor = inputSampleRate / targetSampleRate,
@@ -130,8 +120,8 @@ function downsample(inL, inR, targetSampleRate) {
     audioOutputLeft = new Float32Array(inputLength / downsamplingFactor);
     audioOutputRight = new Float32Array(inputLength / downsamplingFactor);
     for (i = 0; i < inputLength; i += downsamplingFactor) {
-        audioOutputLeft[j] = downsample(downsamplingFactor, inL, i);
-        audioOutputRight[j] = downsample(downsamplingFactor, inR, i);
+        audioOutputLeft[j] = inL[i];
+        audioOutputRight[j] = inR[i];
         j += 1;
     }
 }
@@ -247,8 +237,7 @@ window.onload = function () {
             if (outputSampleRate > inputSampleRate) {
                 upsample(audioInputLeft, audioInputRight, outputSampleRate);
             } else if (outputSampleRate < inputSampleRate) {
-                window.alert('Downsampling is not supported at this time.');
-                //downsample(audioInputLeft, audioInputRight, outputSampleRate);
+                downsample(audioInputLeft, audioInputRight, outputSampleRate);
             } else {
                 audioOutputLeft = audioInputLeft;
                 audioOutputRight = audioInputRight;

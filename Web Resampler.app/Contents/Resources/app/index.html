@@ -103,9 +103,39 @@ inputSampleRate = audioInfoDataView.getUint32(24, true);
 console.log('Sample rate: ' + inputSampleRate);
 inputBitDepth = audioInfoDataView.getUint16(34, true);
 console.log('Bit depth: ' + inputBitDepth);
-inputLength = audioInfoDataView.getUint32(40, true) / inputNumChannels / (inputBitDepth / 8);
+inputLength = audioInfoDataView.getUint32(40, true) 
+/ inputNumChannels / (inputBitDepth / 8);
 console.log('Audio length (samples): ' + inputLength);
 console.log('Audio length (seconds): ' + inputLength / inputSampleRate);
+                    </code>
+                    <code>
+console.log('Output infortmation:');
+stringToUint(dataView, 0, 'RIFF');                              // Chunk ID
+dataView.setUint32(4, 44 + length * 2, true);                   // Chunk Size
+stringToUint(dataView, 8, 'WAVE');                              // Format
+// fmt sub-chunk
+stringToUint(dataView, 12, 'fmt ');                             // Sub-chunk 1 ID
+dataView.setUint32(16, 16, true);                               // Sub-chunk 1 Size
+dataView.setUint16(20, 1, true);                                // Audio format
+dataView.setUint16(22, 2, true);                                // Number of channels
+console.log('Channel count: ' + dataView.getUint16(22, true));
+dataView.setUint32(24, outputSampleRate, true);                 // Sample rate
+console.log('Sample rate: ' + dataView.getUint32(24, true));
+dataView.setUint32(28, outputSampleRate * 2 * (16 / 8), true);  // Byte rate
+dataView.setUint16(32, 4, true);                                // Block align
+dataView.setUint16(34, 16, true);                               // Bits per sample
+console.log('Bit depth: ' + dataView.getUint16(34, true));
+// data sub-chunk
+stringToUint(dataView, 36, 'data');                             // Sub-chunk 2 ID
+dataView.setUint32(40, length * 2, true);                       // Sub-chunk 2 Size
+console.log('Audio length (bytes): ' + dataView.getUint32(40, true) 
+/ inputNumChannels / (inputBitDepth / 8));
+console.log('Audio length (seconds): ' + dataView.getUint32(40, true) 
+/ inputNumChannels / (inputBitDepth / 8) / outputSampleRate);
+for (i = 0; i &lt; length; i += 1) {                             // Sub-chunk 2 data
+    dataView.setInt16(j, audioBuffer[i] * 0x7FFF, true);
+    j += 2;
+}
                     </code>
                 </pre>
             </div>

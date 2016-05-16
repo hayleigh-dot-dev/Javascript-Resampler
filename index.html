@@ -50,7 +50,7 @@ while (i &lt; inputLength) {
                     </code>
                 </pre>
                 <p>
-                    Downsampling is accomplished by taking every n samples from the input where n is the downsampling ratio; <code>inputSR / outputSR</code>. When this value is not an integer first the input signal is upsampled to the lowest multiple of the desired samplerate that is greater than the input samplerate. The audio is not filtered and aliasing <b><i>will</i></b> be present if the source audio contains frequencies above the nyquist frequency of the output sample rate.
+                    Downsampling is accomplished by taking every n samples from the input where n is the downsampling ratio; <code>inputSR / outputSR</code>. When this value is not an integer first the input signal is upsampled to the lowest multiple of the desired samplerate that is greater than the input samplerate. The audio is antialiased thanks to an algorithm posted on musicdsp.org <a href="http://musicdsp.org/showArchiveComment.php?ArchiveID=214">here</a>. From my understanding it is a triangular windowed averaging filter although I don't entirely understand how this accomplishes antialiasing.
                 </p>
                 <pre>
                     <code>
@@ -136,6 +136,35 @@ for (i = 0; i &lt; length; i += 1) {                             // Sub-chunk 2 
     dataView.setInt16(j, audioBuffer[i] * 0x7FFF, true);
     j += 2;
 }
+                    </code>
+                </pre>
+                <p>
+                    The application is packaged using Electron, a framework based on the Chromium browser and Node package manager and features native APIs to interface with low level operating system compenents for features such as file input and native menus and notifactions. The core of the application is the <code>main.js</code> file that tells electron how to handle certain API calls and how to create the application itself.
+                </p>
+                <pre>
+                    <code>
+function createWindow () {
+  mainWindow = new BrowserWindow({width: 800, height: 650})
+  mainWindow.loadURL('file://' + __dirname + '/index.html')
+  mainWindow.on('closed', function () {
+    // Dereference the window object.
+    mainWindow = null
+  })
+}
+
+app.on('ready', createWindow)
+
+app.on('window-all-closed', function () {
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
+})
+
+app.on('activate', function () {
+  if (mainWindow === null) {
+    createWindow()
+  }
+})
                     </code>
                 </pre>
             </div>

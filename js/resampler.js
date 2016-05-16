@@ -38,6 +38,15 @@ function getAudio(dataView) {
         for (i = 0; i < inputLength * inputNumChannels * 2; i += 2) {
             // Divide by 0x7FFF (32767) to get values between 0 and 1.
             audioInputLeft[j] = dataView.getInt16(44 + i, true) / 0x7FFF;
+            /* Douglass Crockford writes in his book JavaScript: The Good Parts     //
+            // (and in jslint) that: The ++ (increment) and -- (decrement)          //
+            // operators have been known to contribute to bad code by encouraging   //
+            // excessive trickiness. They are second only to faulty architecture in //
+            // enabling to viruses and other security menaces. Also,                //
+            // preincrement/postincrement confusion can produce off-by-one errors   //
+            // that are extremely difficult to diagnose.                            //
+            // While this is largely a stylistic choice, I've chosen to adopt the   //
+            // style for far greater readability.                                   */
             j += 1;
         }
     } else if (inputNumChannels === 2) {
